@@ -1,59 +1,80 @@
 const { io } = require('../index');
-const Bands = require('../models/bands');
-const Band = require('../models/band');
+const { verifyJWT } = require('../helpers/jwt');
+const { userConnected, disconnectUser, saveMessage } = require('../controllers/socket');
 
-const bands = new Bands();
-
-bands.addBand(new Band(  'Queen' ));
-bands.addBand(new Band( 'The Beatles' ));
-bands.addBand(new Band( 'Led Zeppelin' ));
-bands.addBand(new Band( 'Metallica' ));
 
 // Socket messages
 io.on('connection', (client) => {
     console.log('client connected');
 
-    client.emit('initial-bands', bands.getBands());
+    const [valid, uid] = verifyJWT(client.handshake.headers['x-token']);
+    if (!valid) {
+        console.log('Invalid token');
+        return client.disconnect();
+    }
+
+    // User connected
+    userConnected(uid);
+
+    // User enter in room
+    client.join(uid);
+
+    // Listen to private messages
+    client.on('private-message', async (payload) => {
+        await saveMessage(payload);
+        io.to(payload.to).emit('private-message', payload)
+    });
+
+    // Emit message to client
+    client.on('emit-message', (payload) => {
+        console.log('emit-message', payload);
+        client.broadcast.emit('new-message', {
+            id: client.id,
+            ...payload
+        });
+    });
+
+    // global room
+    io.of('/').emit('global-room', {
+        event: 'user-connected',
+        uid
+    });
+
+    // User left room
+    client.on('leave-room', (room) => {
+        client.leave(room);
+    });
+
+    // User joined room
+    client.on('join-room', (room) => {
+        client.join(room);
+    });
+
+    // User changed name
+    client.on('change-name', (payload) => {
+        console.log('change-name', payload);
+        client.broadcast.emit('user-changed-name', {
+            uid,
+            newName: payload.newName
+        });
+    });
+
+    // User typing in chat
+    client.on('typing', (payload) => {
+        console.log('typing', payload);
+        client.broadcast.emit('user-typing', payload);
+    });
+
+    // User disconnected
+    client.on('disconnect', () => {
+        disconnectUser(uid);
+    });
+
+
 
     client.on('disconnect', () => {
         console.log('client disconnected');
     });
-
-    // client.on('message', (payload) => {
-    //     console.log('message', payload);
-    //     io.emit('message', {
-    //         id: client.id,
-    //         ...payload
-    //     });
-    // });
-
-    // client.on('emit-message', (payload) => {
-    //     console.log('emit-message', payload);
-
-    //     client.broadcast.emit('new-message', {
-    //         id: client.id,
-    //         ...payload
-    //     });
-
-    // });
-
-    // client.on('vote', function(payload) {
-    //     console.log('vote', payload);
-    //     bands.voteBand(payload.id);
-    //     io.emit('initial-bands', bands.getBands());
-    // });
-
-    // client.on('add-band', function (payload) {
-    //     console.log('add-band', payload);
-    //     bands.addBand(new Band(payload.name));
-    //     io.emit('initial-bands', bands.getBands());
-    // });
-
-    // client.on('delete-band', function (payload) {
-    //     console.log('delete-band', payload);
-    //     bands.deleteBand(payload.id);
-    //     io.emit('initial-bands', bands.getBands());
-    // });
 
 });
 

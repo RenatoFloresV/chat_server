@@ -4,11 +4,13 @@ const validateFields = (req, res, next) => {
 
     const errors = validationResult(req);
 
+    const firstErrorMsg = errors.array().map(error => error.msg)[0];
+
     if (!errors.isEmpty()) {
         return res.status(400).json({
             ok: false,
-            errors: errors.mapped()
-        })
+            errorMsg: firstErrorMsg,
+        });
     }
 
     next();

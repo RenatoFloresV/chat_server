@@ -25,7 +25,7 @@ router.post('/new', [
 
 
 // Login
-router.get('/', [
+router.post('/', [
     check('email', 'The email is required').not().isEmpty(),
     validateFields,
     check('email', 'The email is not valid').isEmail(),

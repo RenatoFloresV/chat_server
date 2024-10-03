@@ -5,6 +5,7 @@ const bcrypt = require("bcryptjs");
 
 const User = require("../models/user");
 const { generateJWT } = require("../helpers/jwt");
+const user = require("../models/user");
 
 const createUser = async (req, res = response) => {
 
@@ -15,7 +16,7 @@ const createUser = async (req, res = response) => {
         if (existEmail) {
             return res.status(400).json({
                 ok: false,
-                msg: "The email already exists",
+                errorMsg: "The email already exists",
             });
         }
 
@@ -32,7 +33,9 @@ const createUser = async (req, res = response) => {
 
         res.json({
             ok: true,
-            body: user,
+            user: user,
+            msg: "Welcome, " + user.name,
+            token: token,
         });
     } catch (error) {
         console.log(error);
@@ -48,7 +51,7 @@ const loginUser = async (req, res = response) => {
         if (!existEmail) {
             return res.status(404).json({
                 ok: false,
-                msg: "The email does not exist",
+                errorMsg: "The email does not exist",
             });
         }
 
@@ -56,16 +59,20 @@ const loginUser = async (req, res = response) => {
         if (!validPassword) {
             return res.status(400).json({
                 ok: false,
-                msg: "The password is incorrect",
+                errorMsg: "The password is incorrect",
             });
         }
 
         // Generate JWT
         const token = await generateJWT(existEmail.id);
 
+        // Get user
+        const user = await User.findOne({ email });
+
         res.json({
             ok: true,
             msg: "Welcome back, " + existEmail.name,
+            user,
             token
         });
     } catch (error) {
@@ -81,7 +88,7 @@ const renewToken = async (req, res = response) => {
     const token = await generateJWT(uid);
 
     // Get user
-    const user = await User.findOne({ uid });
+    const user = await User.findById(uid);
 
     res.json({
         ok: true,
